@@ -132,21 +132,54 @@ model.
 
 \subsection{Process Model}
 
-Kinematic model follows the common unicycle model for wheeled-mobile robots (WMRs).
-This thesis is assuming 2D planar motion so the states are x, y, and theta.
-\\ \\
+The kinematic model for the robot follows the common unicycle model for a 
+differentially driven wheeled-mobile robots (WMRs). This thesis is assuming 2D planar 
+motion so the states are x, y, and theta. Equation 2.4 below describes the state 
+transition matrix for this system. 
+\\
 \begin{equation}
   x = z = [x, y, \theta]^T
 \end{equation}
 
 \begin{equation}
-  f = \begin{bmatrix}
-        vcos(\theta) & 0 \\
-        vsin(\theta) & 0 \\
-              0      & w
-      \end{bmatrix}
+  \dot{x} = f(x)u = 
+  \begin{bmatrix}
+      \cos(\theta) & 0 \\
+      \sin(\theta) & 0 \\
+      0 & 1
+  \end{bmatrix}
+  \begin{bmatrix}
+      v \\
+      w
+  \end{bmatrix}
 \end{equation}
-where $v$ and $w$ are the linear and angular velocity of the mobile robot.
+
+where $v$ and $w$ are the linear and angular velocity of the mobile robot. Since we 
+are working with a differential drive robot, the linear and angular velocities need 
+to be related to the individual wheel speeds of the robot. The relationship 
+between $v$ and $w$ and $v_L$ and $v_R$, the left and right wheel speeds of the robot 
+can be seen in equations 2.5 and 2.6, where $r$ is the radius of the robot's wheel and 
+$l$ is the distance between the wheels. 
+
+\begin{equation}
+  v = \frac{r}{2} (v_R + v_L)
+\end{equation}
+
+\begin{equation}
+  w = \frac{r}{l} (v_R - v_L)
+\end{equation}
+
+Since this model is non-linear, the Extended Kalman Filter (EKF) is used to estimate 
+the states. To implement the EKF, the Jacobian of the state transition matrix must be 
+found to create a linear approximation of our non-linear equations. The EKF works by 
+using a first order taylor approximation to linearize the model around the current 
+state and uses the Jacobian of the model equations to calculate the covariance. To 
+find the covariance, equation 2.7 is used where F is the Jacobian of the unicycle 
+robot model, P is the current covariance, and Q is the process noise. 
+
+\begin{equation}
+  P^- = FPF^T + Q
+\end{equation}
 
 \begin{equation}
   F = \begin{bmatrix}
@@ -156,25 +189,27 @@ where $v$ and $w$ are the linear and angular velocity of the mobile robot.
   \end{bmatrix}
 \end{equation}
 
-
-
 \subsection{Measurement Model}
 
-The measurement model here is identity because the states can be directly 
-accessed with minimal calculations. Going into this system will be the corrected 
-and compensated position and orientation data that is found from our second KF.
-These are then used to estimate the states taking into account the robots kinematic
-constraints along with the sensor measurements.  
-
-\emph{Add equations on how pose is found using sensor data}
-
 \begin{equation}
-  h = \begin{bmatrix}
+  z = h(x)x =  
+  \begin{bmatrix}
     1 & 0 &  0 \\
     0 & 1 &  0 \\
     0 & 0 &  1
   \end{bmatrix}
+  \begin{bmatrix}
+    x \\
+    y \\
+    \theta
+\end{bmatrix}
 \end{equation}
+
+The measurement model as well as its Jacobian are identity because the states can 
+be directly accessed with intermediate calculations. Here the Jacobian is used to 
+find the innovation covariance and can be found through equation 2.11, where $P$ is 
+the covariance found from the prediction state of the Kalman filter and $R$ is the 
+measurement noise.
 
 \begin{equation}
   H = \begin{bmatrix}
@@ -182,6 +217,43 @@ constraints along with the sensor measurements.
     0 & 1 & 0 \\
     0 & 0 & 1
   \end{bmatrix}
+\end{equation}
+
+\begin{equation}
+  S = HPH^T + R
+\end{equation}
+
+Going into this system will be the corrected and compensated position and 
+orientation data that is found from our second Kalman Filter. In other words, the 
+measurement for the first Kalman Filter is the estimation from the second Kalman 
+Filter. These are then used to estimate the states taking into account the robots 
+kinematic constraints along with the sensor measurements.  
+
+To solve for heading given the gyroscope data, $w_g$ a simple Euler integration is carried 
+out and can be seen in equation 2.11. 
+
+\begin{equation}
+  \theta = \theta_0 + w_g \Delta t
+\end{equation}
+
+To get global $x$ and $y$ position data from 
+accelerometer readings, the local acceleration readings, $a^b$, are transformed using 
+$C^g_b$ which is a rotation matrix about the z-axis, and become $a^g$, then double 
+integration is carried out to arrive at global position. These conversions can be 
+seen from equations 2.12-2.14. The overall conversion from the 
+compensated sensor readings to the appropriate states are handled externally from 
+the Kalman Filters and can be described through equations 2.11--2.14.
+
+\begin{equation}
+  a^g =  C^g_b a^b
+\end{equation}
+
+\begin{equation}
+  v = v_0 + a^g \Delta t
+\end{equation}
+
+\begin{equation}
+  p = p_0 + v \Delta t
 \end{equation}
 
 %%%
@@ -197,14 +269,19 @@ states as well as correction terms to compensate for sensor errors.
 
 \subsection{Process Model}
 
-This states are orientation error ($\delta\phi$), velocity error ($\delta v$), 
-gyroscope bias ($b_g$), and accelerometer bias ($b_a$).
+The states are orientation error ($\delta\phi$), velocity error ($\delta v$), 
+gyroscope bias ($b_g$), and accelerometer bias ($b_a$). Each state mentioned has 3 
+components relating to the north-east-down (NED) coordinate frame which gives a 
+total of 12 states for the second Kalman filter.
 
 \begin{equation}
   \boldsymbol{x}_2 = [\delta\boldsymbol{\phi}^T, \delta\boldsymbol{v}^T,
        \boldsymbol{b}^T_g, \boldsymbol{b}^T_a]^T
 \end{equation}
 
+The state transition matrix is one adopted from the popular pedestrian dead 
+reckoning algorithm (PDR) for pedestrian rather than mobile robot navigation. The 
+process model can be described through equations 2.17--2.21. The heading error is 
 
 \begin{equation}
   f = \begin{bmatrix}

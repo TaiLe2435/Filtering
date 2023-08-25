@@ -28,57 +28,100 @@ z = imu(w, v, gt, dt) + [randn(size(gt,1)+1, 1)*Q_accel ...
                          randn(size(gt,1)+1, 1)*Q_accel ...
                          randn(size(gt,1)+1, 1)*Q_gyro];
 
-% simulating angular random walk
-drift = 0;
-for i=1:num_iterations
-    z(i, 3) = z(i, 3) + drift;
-    drift = drift + pi/360; % drift around 180deg/hr | 0.5deg/sec
+z(:,3) = wrapToPi(z(:,3));
+
+% interpolated heading IMU measurement
+interp = imu(w, v, gt, dt) + [randn(size(gt,1)+1, 1)*Q_accel ... 
+                              randn(size(gt,1)+1, 1)*Q_accel ...
+                              randn(size(gt,1)+1, 1)*Q_gyro];
+
+fs = 0.1;
+
+interp(:,2) = lowpass(interp(:, 2), fs);
+interp(:,3) = lowpass(interp(:, 3), fs);
+
+% find new heading from interpolated accel data
+sInit = [0, 0];
+interpHeading = [];
+for k=1:length(interp)
+    y = interp(k, 2) - sInit(2);
+    x = interp(k, 1) - sInit(1);
+    sInit(1) = interp(k, 1);
+    sInit(2) = interp(k, 2);
+    input = y/x;
+    interpHeading = [interpHeading, atan(input)];
+
 end
+
+interp(:,3) = lowpass(interpHeading, fs)';
+interp(:,3) = interpHeading';
+
+figure(4);
+hold on;
+plot(interp(:, 1));
+plot(interp(:, 2));
+
+plot(lowpass(interp(:, 1), fs));
+plot(lowpass(interp(:, 2), fs));
+hold off;
+
+figure(3);
+hold on;
+plot(interp(:,3));
+plot(z(:, 3));
+hold off;
+
+% simulating angular random walk
+% drift = 0;
+% for i=1:num_iterations
+%     z(i, 3) = z(i, 3) + drift;
+%     drift = drift + pi/360; % drift around 180deg/hr | 0.5deg/sec
+% end
 
 % ================== static data ===================================
-setup = [randn(size(gt,1)+1, 1)*Q_accel ... 
-        randn(size(gt,1)+1, 1)*Q_accel ...
-        randn(size(gt,1)+1, 1)*Q_gyro];
-
-drift = 0;
-for i=1:size(gt)
-    setup(i, 3) = setup(i, 3) + drift;
-    drift = drift + pi/360; % drift around 180deg/hr | 0.5deg/sec
-end
-
-% numerically differentiate to get simulated imu data
-vx = diff(setup(:,1)) ./ diff(t(size(setup(:,1))));
-ax = diff(vx) ./ diff(t(size(vx)));
-
-vy = diff(setup(:,2)) ./ diff(t(size(setup(:,2))));
-ay = diff(vy) ./ diff(t(size(vy)));
-
-wz = diff(setup(:,3)) ./ diff(t(size(wz)));
-
-% signal preprocessing
-bias = zeros(size(setup, 1), 3);
-bias = biasCorrection(setup(:,1), setup(:,2), wz); % param 1 and 2 need to be updated to wx and wy
-wzBias = bias(1,3);
-wzStatic = wz - wzBias;
-
-% NMNI
-wTh = NMNI(setup(:,1), setup(:,2), wzStatic);      % param 1 and 2 need to be updated to wx and wy
-
-% NDZTA
-aTh = NDZTA(ax, ay, setup(:,3));                   % param 3 needs to be updated to az
-
-% logic for zero update
-for i=1:length(wzStatic)
-    if abs(z(i,1)) < aTh(1,1)
-       z(i,1) = 0;
-    end
-    if abs(z(i,2)) < aTh(1,2)
-        z(i,2) = 0;
-    end
-    if abs(z(i,3)) < wTh(1,3)
-        z(i,3) = 0;
-    end
-end
+% setup = [randn(size(gt,1)+1, 1)*Q_accel ... 
+%         randn(size(gt,1)+1, 1)*Q_accel ...
+%         randn(size(gt,1)+1, 1)*Q_gyro];
+% 
+% drift = 0;
+% for i=1:size(gt)
+%     setup(i, 3) = setup(i, 3) + drift;
+%     drift = drift + pi/360; % drift around 180deg/hr | 0.5deg/sec
+% end
+% 
+% % numerically differentiate to get simulated imu data
+% vx = diff(setup(:,1)) ./ diff(t(size(setup(:,1))));
+% ax = diff(vx) ./ diff(t(size(vx)));
+% 
+% vy = diff(setup(:,2)) ./ diff(t(size(setup(:,2))));
+% ay = diff(vy) ./ diff(t(size(vy)));
+% 
+% wz = diff(setup(:,3)) ./ diff(t(size(setup(:,3))));
+% 
+% % signal preprocessing
+% bias = zeros(size(setup, 1), 3);
+% bias = biasCorrection(setup(:,1), setup(:,2), wz); % param 1 and 2 need to be updated to wx and wy
+% wzBias = bias(1,3);
+% wzStatic = wz - wzBias;
+% 
+% % NMNI
+% wTh = NMNI(setup(:,1), setup(:,2), wzStatic);      % param 1 and 2 need to be updated to wx and wy
+% 
+% % NDZTA
+% aTh = NDZTA(ax, ay, setup(:,3));                   % param 3 needs to be updated to az
+% 
+% % logic for zero update
+% for i=1:length(wzStatic)
+%     if abs(z(i,1)) < aTh(1,1)
+%        z(i,1) = 0;
+%     end
+%     if abs(z(i,2)) < aTh(1,2)
+%         z(i,2) = 0;
+%     end
+%     if abs(z(i,3)) < wTh(1,3)
+%         z(i,3) = 0;
+%     end
+% end
 
 % figure(10);
 % hold on;
@@ -90,7 +133,10 @@ x0(1:2,1)=gt(1,1:2);
 x0(3,1)=0;
 P0=eye(3);
 
-ekf(dt, z, x0, P0, v, w, gt) % this z still has bias in gyro
+% for z, use interpolated heading from the position instead of what it
+% currently is
+
+ekf(dt, interp, x0, P0, v, w, gt) % this z still has bias in gyro
 
 % ===================== Functions ============================
 
@@ -167,10 +213,10 @@ end
 
 function [xk_, P_] = predict(xk, P, Qk, f, Fk)
     % States
-    xk_ = f(xk);
+    xk_ = f(xk); % taylor expansion
 
     % Covariance
-    P_ = Fk*P*Fk' + Qk;
+    P_ = Fk*P*Fk' + Qk; % Jacobian
 end
 
 function [xk, P] = update(xk_, P_, R, z, h, Hjacob)
@@ -178,13 +224,13 @@ function [xk, P] = update(xk_, P_, R, z, h, Hjacob)
     [~,n] = size(xk_);
     
     % handle Jacobian of measurement model
-    Hk = Hjacob;
+    Hk = Hjacob; % Jacobian
 
     % Innovation Covariance
     S = Hk*P_*Hk' + R;
 
     % Measurement Model
-    zh = h;
+    zh = h; % Taylor expansion
 
     % Innovation
     innovation = z - zh;
