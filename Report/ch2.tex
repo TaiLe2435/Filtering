@@ -245,7 +245,7 @@ compensated sensor readings to the appropriate states are handled externally fro
 the Kalman Filters and can be described through equations 2.11--2.14.
 
 \begin{equation}
-  a^g =  C^g_b a^b
+  a^g = C^g_b a^b
 \end{equation}
 
 \begin{equation}
@@ -263,7 +263,7 @@ the Kalman Filters and can be described through equations 2.11--2.14.
 \section{Second KF: Bias Estimation Kalman Filter}
 
 This section covers the second Kalman Filter in the cascaded Kalman Filter 
-framework.This Kalman filter uses the gyroscope model as the process model, 
+framework. This Kalman filter uses the gyroscope model as the process model, 
 and uses the accelerometer data as the measurement model to estimate our 
 states as well as correction terms to compensate for sensor errors.
 
@@ -279,22 +279,70 @@ total of 12 states for the second Kalman filter.
        \boldsymbol{b}^T_g, \boldsymbol{b}^T_a]^T
 \end{equation}
 
-The state transition matrix is one adopted from the popular pedestrian dead 
-reckoning algorithm (PDR) for pedestrian rather than mobile robot navigation. The 
-process model can be described through equations 2.17--2.21. The heading error is 
+The Kalman Filter framework and state transition matrix is one adopted from the 
+popular pedestrian dead reckoning algorithm (PDR) for pedestrian rather than mobile 
+robot navigation. The process model can be described through equations 2.17--2.20. 
 
 \begin{equation}
-  f = \begin{bmatrix}
+  \delta{\dot{\boldsymbol{\phi}}} = 
+  - \boldsymbol{C_b^n}\boldsymbol{b}_g^T - \boldsymbol{C_b^n}\boldsymbol{n}_g^T
+\end{equation}  
+
+The derivative of the heading error can be described by the sum of the gyro bias 
+and noise, transformed into the global coordinate frame, as shown in equation 2.17.
+
+\begin{equation}
+  \delta{\dot{\boldsymbol{v}}} = 
+  \boldsymbol{S}\delta\boldsymbol{\phi} + \boldsymbol{C}^n_b\boldsymbol{b}_a^T + \boldsymbol{C}^n_b\boldsymbol{n}^T_a
+\end{equation}  
+
+The derivative of the velocity error, also known as the acceleration error, is 
+defined in a similar manner where it is the sum of the accelerometer noise and 
+bias, transformed into the global coordinate frame, with the addition of the 
+acceleration readings multipled by the previously found heading error. 
+
+\begin{equation}
+  \dot{\boldsymbol{b}}_g = 
+  - \beta_g\boldsymbol{I}_{3x3}\boldsymbol{b}_g^T + \boldsymbol{I}_{3x3}w_g^T
+\end{equation}  
+
+\begin{equation}
+  \dot{\boldsymbol{b}}_a = 
+  - \beta_a\boldsymbol{I}_{3x3}\boldsymbol{b}_a^T + \boldsymbol{I}_{3x3}w_a^T
+\end{equation}  
+
+The derivative of the accelerometer and gyroscope bias is as a first order Gauss-Markov model,
+
+\begin{equation}
+  \dot{x} = \beta x + n
+\end{equation}
+
+where the $\beta$ values are the Markov process time constants that model our
+biases. Equations 2.17--2.20 can be put together to describe our overall model 
+in equation 2.22. 
+
+\begin{equation}
+  \boldsymbol{\dot{x}}_2 = \boldsymbol{f}\boldsymbol{x}_2 + \boldsymbol{g}\boldsymbol{w} = \begin{bmatrix}
         \boldsymbol{0}_{3x3} & \boldsymbol{0}_{3x3} & \boldsymbol{-C}^n_b & \boldsymbol{0}_{3x3} \\
         \boldsymbol{S} & \boldsymbol{0}_{3x3} & \boldsymbol{0}_{3x3} & \boldsymbol{C}^n_b \\
         \boldsymbol{0}_{3x3} & \boldsymbol{0}_{3x3} & -\beta_g\boldsymbol{I}_{3x3} & \boldsymbol{0}_{3x3} \\
         \boldsymbol{0}_{3x3} & \boldsymbol{0}_{3x3} & \boldsymbol{0}_{3x3} & -\beta_a\boldsymbol{I}_{3x3}
-      \end{bmatrix}
+      \end{bmatrix}\boldsymbol{x_2}
+      +
+      \begin{bmatrix}
+        \boldsymbol{-C}^n_b & \boldsymbol{0}_{3x3} & \boldsymbol{0}_{3x3} & \boldsymbol{0}_{3x3} \\
+        \boldsymbol{0}_{3x3} & \boldsymbol{C}^n_b & \boldsymbol{0}_{3x3} & \boldsymbol{0}_{3x3} \\
+        \boldsymbol{0}_{3x3} & \boldsymbol{0}_{3x3} & \boldsymbol{I}_{3x3} & \boldsymbol{0}_{3x3} \\
+        \boldsymbol{0}_{3x3} & \boldsymbol{0}_{3x3} & \boldsymbol{0}_{3x3} & \boldsymbol{I}_{3x3}
+      \end{bmatrix}\boldsymbol{w}
 \end{equation}
 
-C (don't know if definition is correct) is a rotation matrix. S is a skew symmetric matrix of acceleration representing
-vector cross product. $\beta$ are the Markov process time constants that model our
-biases. 
+where $\boldsymbol{C}$ is a rotation matrix representing the transformation from the local coordinate 
+to global coordinates, $\boldsymbol{S}$ is a skew symmetric matrix of acceleration representing
+vector cross product, and $\boldsymbol{w} = 
+\begin{bmatrix}
+  \boldsymbol{n_g}^T & \boldsymbol{n_a}^T & w_g^T & w_a^T \\
+\end{bmatrix}^T$ is the input process noise vector. 
 
 \begin{equation}
   \boldsymbol{C}^n_b = \begin{bmatrix}
@@ -305,7 +353,7 @@ biases.
 \end{equation}
 
 \begin{equation}
-  S = \begin{bmatrix}
+  \boldsymbol{S} = \begin{bmatrix}
         0 & -a_D & a_E \\
         a_D & 0 & -a_N \\
         -a_E & a_N & 0 \\
@@ -315,7 +363,7 @@ biases.
 \subsection{Measurement Model}
 
 Measurements are course angle error and velocity measurements. Course angle error
-is found by taking the difference between the KF estimated heading angle from the 
+is found by taking the difference between the previously estimated heading angle from the 
 gyro and unicycle model and the estimated heading found from using the previous 
 and current position data that provides the heading for the robot to linearly 
 move from the previous point to the current point.
@@ -327,29 +375,12 @@ move from the previous point to the current point.
 where $\theta_{est}$ is the heading estimated by the kalman filter and $\theta_{acc}$ 
 is the heading found from the position data. 
 
-\emph{COMMENT} \\
-But doesn't heading from kinematics come from acc and gyro already? So instead,
-take the improved heading from fusing kinematics with acc and gyro, and pass to 
-gyro KF instead of heading error. 
-
-So first KF takes x, y, $\theta$ as measurement and outputs $\theta$ into KF2. 
-KF2 then takes in v and $\theta$ to estimate errors to correct/compensate 
-sensor measurements and vel and orientation errors. These improvements of 
-measurement errors and state errors should improve x, y, $\theta$ and improve 
-estimates in the first KF. Those will be the states that we care more about.
-
-But if we are just going to use the states estimated by the first KF, why don't 
-we just find orientations and pass it to first KF rather than find errors, then 
-externally correct them then pass them to the first KF. 
-\\
-\emph{COMMENT}
-
 \begin{equation}
-  z_2 = [\delta\theta, \boldsymbol{v}]^T
+  \boldsymbol{z}_2 = [\delta\theta, \boldsymbol{v}]^T
 \end{equation}
 
 \begin{equation}
-  h = \begin{bmatrix}
+  \boldsymbol{h}_2 = \begin{bmatrix}
       \begin{bmatrix}tan(\phi_N)cos(\phi_D) & tan(\phi_N)sin(\phi_D) & -1\end{bmatrix} & \boldsymbol{0}_{1x3} & \boldsymbol{0}_{1x3} & \boldsymbol{0}_{1x3} \\
       \boldsymbol{0}_{3x3} & \boldsymbol{I}_{3x3} & \boldsymbol{0}_{3x3} & \boldsymbol{0}_{3x3}
       \end{bmatrix}

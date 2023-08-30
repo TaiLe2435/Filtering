@@ -18,9 +18,9 @@
 \contentsline {subsection}{\numberline {2.2.2}Measurement Model}{9}{}%
 \contentsline {section}{\numberline {2.3}Second KF: Bias Estimation Kalman Filter}{11}{}%
 \contentsline {subsection}{\numberline {2.3.1}Process Model}{11}{}%
-\contentsline {subsection}{\numberline {2.3.2}Measurement Model}{12}{}%
-\contentsline {section}{\numberline {2.4}Estimation with Additional Sensor}{13}{}%
-\contentsline {chapter}{\numberline {3}Future Work}{14}{}%
-\contentsline {section}{\numberline {3.1}Simulation}{14}{}%
-\contentsline {section}{\numberline {3.2}Physical Implementation}{14}{}%
+\contentsline {subsection}{\numberline {2.3.2}Measurement Model}{13}{}%
+\contentsline {section}{\numberline {2.4}Estimation with Additional Sensor}{14}{}%
+\contentsline {chapter}{\numberline {3}Future Work}{15}{}%
+\contentsline {section}{\numberline {3.1}Simulation}{15}{}%
+\contentsline {section}{\numberline {3.2}Physical Implementation}{15}{}%
 \contentsfinish 
