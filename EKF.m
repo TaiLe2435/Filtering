@@ -6,7 +6,7 @@ tspan = 0:dt:4; % time for simulation
 num_iterations = 100;
 
 % ode with initial conditions 
-i1 = [0 0 0];
+i1 = [0 0 0];               % x, y, theta
 v = 10;                     % change v and w to make square path
 w = 2;
 
@@ -30,34 +30,54 @@ z = imu(w, v, gt, dt) + [randn(size(gt,1)+1, 1)*Q_accel ...
 
 z(:,3) = wrapToPi(z(:,3));
 
+Q_accel_interp = 0.03;   % m/s^2 0.03
+Q_gyro_interp = pi/(20^2); % rad/s   pi/16
+
 % interpolated heading IMU measurement
-interp = imu(w, v, gt, dt) + [randn(size(gt,1)+1, 1)*Q_accel ... 
-                              randn(size(gt,1)+1, 1)*Q_accel ...
-                              randn(size(gt,1)+1, 1)*Q_gyro];
+interp = imu(w, v, gt, dt) + [randn(size(gt,1)+1, 1)*Q_accel_interp ... 
+                              randn(size(gt,1)+1, 1)*Q_accel_interp ...
+                              randn(size(gt,1)+1, 1)*Q_gyro_interp];
 
 fs = 0.1;
 
-interp(:,2) = lowpass(interp(:, 2), fs);
-interp(:,3) = lowpass(interp(:, 3), fs);
+% interp(:,2) = lowpass(interp(:, 2), fs);
+% interp(:,3) = lowpass(interp(:, 3), fs);
 
 % find new heading from interpolated accel data
-sInit = [0, 0];
-interpHeading = [];
-for k=1:length(interp)
+% Initialize variables
+accumulated_heading = 0;  % Initialize accumulated heading
+interpHeading = [0];     % Initialize heading array with zero
+sInit = [interp(1,1), interp(1,2)];
+
+for k = 2:length(interp)
     y = interp(k, 2) - sInit(2);
     x = interp(k, 1) - sInit(1);
     sInit(1) = interp(k, 1);
     sInit(2) = interp(k, 2);
-    input = y/x;
-    interpHeading = [interpHeading, atan(input)];
 
+    % Calculate change in heading
+    delta_heading = atan2(y, x) - accumulated_heading;
+
+    % Handle discontinuity
+    if delta_heading > pi
+        delta_heading = delta_heading - 2*pi;
+    elseif delta_heading < -pi
+        delta_heading = delta_heading + 2*pi;
+    end
+
+    % Update accumulated heading
+    accumulated_heading = accumulated_heading + delta_heading;
+
+    % Store the accumulated heading
+    interpHeading = [interpHeading, accumulated_heading];
 end
 
-interp(:,3) = lowpass(interpHeading, fs)';
+% interp(:,3) = lowpass(interpHeading, fs)';
 interp(:,3) = interpHeading';
 
 figure(4);
 hold on;
+% legend('x', 'y', 'xLP', 'yLP');
 plot(interp(:, 1));
 plot(interp(:, 2));
 
@@ -67,6 +87,7 @@ hold off;
 
 figure(3);
 hold on;
+% legend('interpHeading', 'groundTruth');
 plot(interp(:,3));
 plot(z(:, 3));
 hold off;
@@ -136,7 +157,7 @@ P0=eye(3);
 % for z, use interpolated heading from the position instead of what it
 % currently is
 
-ekf(dt, interp, x0, P0, v, w, gt) % this z still has bias in gyro
+foo = ekf(dt, interp, x0, P0, v, w, gt); % this z still has bias in gyro
 
 % ===================== Functions ============================
 
@@ -244,7 +265,7 @@ function [xk, P] = update(xk_, P_, R, z, h, Hjacob)
 
 end
 
-function ekf(dt, z, x0, P0, v, w, gt)
+function xk = ekf(dt, z, x0, P0, v, w, gt)
     
     n = size(x0, 1);
     m = size(z, 1);
