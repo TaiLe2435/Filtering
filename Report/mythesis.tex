@@ -49,7 +49,22 @@ Robot \\ using a Cascaded Kalman Filter Framework}
 \director{Dr. Ji-Chul Ryu}
 
 \begin{abstract}
-
+Localization is one of the most important aspects in the development of  
+autonomous mobile robots. For effective navigation of these robots, 
+an efficient localization algorithm is needed. Typical localization, or
+state-estimation algorithms, require an IMU along with an external reference 
+that provides highly-precise pose information, such as a GNSS for outdoor 
+applications. In indoor applications, GNSS data is not accessible so many 
+mobile robot implementations turn to magnetometers to provide the additional pose 
+information. However, with the push to miniaturize these robotic systems, 
+magnetometers are not always reliable due to their close proximity to motors and 
+other electronics, causing magnetic distortion and in turn, incorrect pose 
+information. To address this issue, this thesis proposes a magnetometer-less 
+state-estimation algorithm based on a cascaded Extended Kalman Filter (EKF) framework 
+for localization of an autonomous mobile robot. The presentation will include 
+background information on estimation and the Kalman Filter, explanation of the
+mathematical models for the algorithm, as well as simulation results, proving 
+the feasibility for physical implementation on a mobile robot. 
 \end{abstract}
 
 \begin{acknowledgments}

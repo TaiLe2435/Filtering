@@ -16,11 +16,11 @@ t = [t; t(end)+dt];
 
 w0 = [0.05; 0.05; pi/8]; % m, m, rad
 
-gt = gt + [randn(size(gt,1), 1)*w0(1) ... 
-           randn(size(gt,1), 1)*w0(2) ...
-           randn(size(gt,1), 1)*w0(3)];
+% gt = gt + [randn(size(gt,1), 1)*w0(1) ... 
+%            randn(size(gt,1), 1)*w0(2) ...
+%            randn(size(gt,1), 1)*w0(3)];
 
-Q_accel = 0.1;   % m/s^2 0.03
+Q_accel = 0.03;   % m/s^2 0.03
 Q_gyro = pi/(16^2); % rad/s   pi/16
 
 % simulated IMU measurement
@@ -28,7 +28,7 @@ z = imu(w, v, gt, dt) + [randn(size(gt,1)+1, 1)*Q_accel ...
                          randn(size(gt,1)+1, 1)*Q_accel ...
                          randn(size(gt,1)+1, 1)*Q_gyro];
 
-z(:,3) = wrapToPi(z(:,3));
+% z(:,3) = wrapToPi(z(:,3));
 
 Q_accel_interp = 0.03;   % m/s^2 0.03
 Q_gyro_interp = pi/(20^2); % rad/s   pi/16
@@ -74,6 +74,7 @@ end
 
 % interp(:,3) = lowpass(interpHeading, fs)';
 interp(:,3) = interpHeading';
+% interp(:,3) = wrapToPi(interp(:,3)); % causes atan2 wrapping problem
 
 figure(4);
 hold on;
@@ -157,7 +158,7 @@ P0=eye(3);
 % for z, use interpolated heading from the position instead of what it
 % currently is
 
-foo = ekf(dt, interp, x0, P0, v, w, gt); % this z still has bias in gyro
+foo = ekf(dt, z, x0, P0, v, w, gt); % this z still has bias in gyro
 
 % ===================== Functions ============================
 
@@ -298,9 +299,9 @@ function xk = ekf(dt, z, x0, P0, v, w, gt)
 
     Hjacobian = imu_linearized;
 
-    Rk = [0.5 0 0;         % assuming 5 cm slip
-          0 0.5 0;
-          0  0 pi/4];       % about 20 deg slip
+    Rk = [0.2 0 0;         
+          0 0.2 0;
+          0  0 (pi/16)^2];      
 
     k0=1;
     kF=T;
@@ -320,6 +321,26 @@ function xk = ekf(dt, z, x0, P0, v, w, gt)
                               % by control inputs?
     end
 
+figure(10);
+hold on;
+title('Position');
+xlabel('x (m)');
+ylabel('y (m)');
+plot(xk(:,1:2), '--', LineWidth=2);
+plot(gt(:,1:2));
+legend('Estimated x position', 'Estimated y position','x position', 'y position');
+hold off;
+
+figure(11);
+hold on;
+title('States vs. Ground Truth');
+xlabel('time (s)');
+ylabel('heading (rads)');
+plot(xk(:,3), '--', LineWidth=2);
+plot(gt(:,3));
+legend('Estimated heading', 'Heading');
+hold off;
+
 show_plots(gt, z, xk, zModel);    
 
 end
@@ -328,11 +349,15 @@ function show_plots(gt, z, xk, zModel)
     
     figure(1);
     hold on;
-    plot(xk(:,1), xk(:, 2));
+    title('EKF for Unicycle Robot');
+    xlabel('x (m)');
+    ylabel('y (m)');
+    plot(xk(:,1), xk(:, 2), '--', 'LineWidth', 2);
     plot(gt(:,1), gt(:, 2));
     legend('estimate', 'ground truth');
     xlim([-inf inf])
     ylim([-inf inf])
+    
     hold off;
 
     figure(2);

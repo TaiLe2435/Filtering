@@ -3,9 +3,9 @@
 
 This part will be an overview of the overall framework of the algorithm. It
 will first discuss preprocessing methods. These methods involve NMNI, NDZTA,
-and error compensation in the gyroscope and accelerometer. Afterwards it will 
-discuss the first and second kalman filter models, then the optional block
-containing the additional sensor to improve the performance of the filter.
+and the complementary filter. Afterwards it will discuss the first and second 
+kalman filter models, then the optional blockcontaining the additional sensor 
+to improve the performance of the filter.
 
 %%% IMU Section
 
@@ -138,11 +138,11 @@ motion so the states are x, y, and theta. Equation 2.4 below describes the state
 transition matrix for this system. 
 \\
 \begin{equation}
-  x = z = [x, y, \theta]^T
+  \boldsymbol{x} = \boldsymbol{z} = [x, y, \theta]^T
 \end{equation}
 
 \begin{equation}
-  \dot{x} = f(x)u = 
+  \boldsymbol{\dot{x}} = \boldsymbol{f(x) }\boldsymbol{u} = 
   \begin{bmatrix}
       \cos(\theta) & 0 \\
       \sin(\theta) & 0 \\
@@ -182,7 +182,7 @@ robot model, P is the current covariance, and Q is the process noise.
 \end{equation}
 
 \begin{equation}
-  F = \begin{bmatrix}
+  \boldsymbol{F} = \begin{bmatrix}
     1 & 0 & -vsin(\theta) \\
     0 & 1 &  vcos(\theta) \\
     0 & 0 &       1
@@ -192,7 +192,7 @@ robot model, P is the current covariance, and Q is the process noise.
 \subsection{Measurement Model}
 
 \begin{equation}
-  z = h(x)x =  
+  \boldsymbol{z} = \boldsymbol{h(x)x} =  
   \begin{bmatrix}
     1 & 0 &  0 \\
     0 & 1 &  0 \\
@@ -225,7 +225,8 @@ measurement noise.
 
 Going into this system will be the corrected and compensated position and 
 orientation data that is found from our second Kalman Filter. In other words, the 
-measurement for the first Kalman Filter is the estimation from the second Kalman 
+measurement for the first Kalman Filter is the compensated position data from the 
+error estimation carried out by the second Kalman 
 Filter. These are then used to estimate the states taking into account the robots 
 kinematic constraints along with the sensor measurements.  
 
@@ -263,9 +264,11 @@ the Kalman Filters and can be described through equations 2.11--2.14.
 \section{Second KF: Bias Estimation Kalman Filter}
 
 This section covers the second Kalman Filter in the cascaded Kalman Filter 
-framework. This Kalman filter uses the gyroscope model as the process model, 
-and uses the accelerometer data as the measurement model to estimate our 
-states as well as correction terms to compensate for sensor errors.
+framework. This Kalman filter follows the popular INS-PDR-EKF framework which is 
+used for pedestrian dead-reckoning. The process model is similar to the typical 
+gyroscope model used for other Kalman filter implementations, while the measurement 
+model describes the relationship between velocity and heading error measurements to 
+the filters error states.
 
 \subsection{Process Model}
 
@@ -299,19 +302,20 @@ and noise, transformed into the global coordinate frame, as shown in equation 2.
 The derivative of the velocity error, also known as the acceleration error, is 
 defined in a similar manner where it is the sum of the accelerometer noise and 
 bias, transformed into the global coordinate frame, with the addition of the 
-acceleration readings multipled by the previously found heading error. 
+acceleration readings cross multipled by the previously found heading error. 
 
 \begin{equation}
   \dot{\boldsymbol{b}}_g = 
-  - \beta_g\boldsymbol{I}_{3x3}\boldsymbol{b}_g^T + \boldsymbol{I}_{3x3}w_g^T
+  - \beta_g\boldsymbol{I}_{3\times3}\boldsymbol{b}_g^T + \boldsymbol{I}_{3\times3}w_g^T
 \end{equation}  
 
 \begin{equation}
   \dot{\boldsymbol{b}}_a = 
-  - \beta_a\boldsymbol{I}_{3x3}\boldsymbol{b}_a^T + \boldsymbol{I}_{3x3}w_a^T
+  - \beta_a\boldsymbol{I}_{3\times3}\boldsymbol{b}_a^T + \boldsymbol{I}_{3\times3}w_a^T
 \end{equation}  
 
 The derivative of the accelerometer and gyroscope bias is as a first order Gauss-Markov model,
+described by equation equation 2.21.
 
 \begin{equation}
   \dot{x} = \beta x + n
@@ -322,18 +326,18 @@ biases. Equations 2.17--2.20 can be put together to describe our overall model
 in equation 2.22. 
 
 \begin{equation}
-  \boldsymbol{\dot{x}}_2 = \boldsymbol{f}\boldsymbol{x}_2 + \boldsymbol{g}\boldsymbol{w} = \begin{bmatrix}
-        \boldsymbol{0}_{3x3} & \boldsymbol{0}_{3x3} & \boldsymbol{-C}^n_b & \boldsymbol{0}_{3x3} \\
-        \boldsymbol{S} & \boldsymbol{0}_{3x3} & \boldsymbol{0}_{3x3} & \boldsymbol{C}^n_b \\
-        \boldsymbol{0}_{3x3} & \boldsymbol{0}_{3x3} & -\beta_g\boldsymbol{I}_{3x3} & \boldsymbol{0}_{3x3} \\
-        \boldsymbol{0}_{3x3} & \boldsymbol{0}_{3x3} & \boldsymbol{0}_{3x3} & -\beta_a\boldsymbol{I}_{3x3}
+  \boldsymbol{\dot{x}}_2 = \boldsymbol{F}\boldsymbol{x}_2 + \boldsymbol{G}\boldsymbol{w} = \begin{bmatrix}
+        \boldsymbol{0}_{3\times3} & \boldsymbol{0}_{3\times3} & \boldsymbol{-C}^n_b & \boldsymbol{0}_{3\times3} \\
+        \boldsymbol{S} & \boldsymbol{0}_{3\times3} & \boldsymbol{0}_{3\times3} & \boldsymbol{C}^n_b \\
+        \boldsymbol{0}_{3\times3} & \boldsymbol{0}_{3\times3} & -\beta_g\boldsymbol{I}_{3\times3} & \boldsymbol{0}_{3\times3} \\
+        \boldsymbol{0}_{3\times3} & \boldsymbol{0}_{3\times3} & \boldsymbol{0}_{3\times3} & -\beta_a\boldsymbol{I}_{3\times3}
       \end{bmatrix}\boldsymbol{x_2}
       +
       \begin{bmatrix}
-        \boldsymbol{-C}^n_b & \boldsymbol{0}_{3x3} & \boldsymbol{0}_{3x3} & \boldsymbol{0}_{3x3} \\
-        \boldsymbol{0}_{3x3} & \boldsymbol{C}^n_b & \boldsymbol{0}_{3x3} & \boldsymbol{0}_{3x3} \\
-        \boldsymbol{0}_{3x3} & \boldsymbol{0}_{3x3} & \boldsymbol{I}_{3x3} & \boldsymbol{0}_{3x3} \\
-        \boldsymbol{0}_{3x3} & \boldsymbol{0}_{3x3} & \boldsymbol{0}_{3x3} & \boldsymbol{I}_{3x3}
+        \boldsymbol{-C}^n_b & \boldsymbol{0}_{3\times3} & \boldsymbol{0}_{3\times3} & \boldsymbol{0}_{3\times3} \\
+        \boldsymbol{0}_{3\times3} & \boldsymbol{C}^n_b & \boldsymbol{0}_{3\times3} & \boldsymbol{0}_{3\times3} \\
+        \boldsymbol{0}_{3\times3} & \boldsymbol{0}_{3\times3} & \boldsymbol{I}_{3\times3} & \boldsymbol{0}_{3\times3} \\
+        \boldsymbol{0}_{3\times3} & \boldsymbol{0}_{3\times3} & \boldsymbol{0}_{3\times3} & \boldsymbol{I}_{3\times3}
       \end{bmatrix}\boldsymbol{w}
 \end{equation}
 
@@ -346,9 +350,9 @@ vector cross product, and $\boldsymbol{w} =
 
 \begin{equation}
   \boldsymbol{C}^n_b = \begin{bmatrix}
-        cos(\phi_D) & -sin(\phi_D) & 0 \\
-        sin(\phi_D) &  cos(\phi_D) & 0 \\
-        0 & 0 & 1 \\
+      C(\phi_E)C(\phi_D) & S(\phi_E) S(\phi_N) C(\phi_D) - C(\phi_N) S(\phi_D) & C(\phi_N) S(\phi_E) C(\phi_D) + S(\phi_N) S(\phi_D) \\
+      C(\phi_E)S(\phi_D) & S(\phi_N) S(\phi_E) S(\phi_D) + C(\phi_N) C(\phi_D) & C(\phi_N) S(\phi_E) S(\phi_D) - C(\phi_D) S(\phi_N) \\
+      -S(\phi_E) & S(\phi_N) C(\phi_E) & C(\phi_N) C(\phi_E) \\
       \end{bmatrix}
 \end{equation}
 
@@ -369,21 +373,25 @@ and current position data that provides the heading for the robot to linearly
 move from the previous point to the current point.
 
 \begin{equation}
-  \delta\theta = \theta_{est} - \theta_{acc}
+  \delta\theta = \theta_{est} - \theta_{interpolated}
 \end{equation}
 
-where $\theta_{est}$ is the heading estimated by the kalman filter and $\theta_{acc}$ 
+where $\theta_{est}$ is the heading estimated by the kalman filter and $\theta_{interpolated}$ 
 is the heading found from the position data. 
 
 \begin{equation}
   \boldsymbol{z}_2 = [\delta\theta, \boldsymbol{v}]^T
 \end{equation}
 
+The measurement model for the second stage Kalman Filter is equation 2.27, and includes 
+the transformed heading error as well as the velocity measurements 
+that are externally calculated from outside of the Kalman Filter blocks. 
+
 \begin{equation}
-  \boldsymbol{h}_2 = \begin{bmatrix}
-      \begin{bmatrix}tan(\phi_N)cos(\phi_D) & tan(\phi_N)sin(\phi_D) & -1\end{bmatrix} & \boldsymbol{0}_{1x3} & \boldsymbol{0}_{1x3} & \boldsymbol{0}_{1x3} \\
-      \boldsymbol{0}_{3x3} & \boldsymbol{I}_{3x3} & \boldsymbol{0}_{3x3} & \boldsymbol{0}_{3x3}
-      \end{bmatrix}
+  \boldsymbol{z}_2 = \boldsymbol{h}_2 \boldsymbol{x}_2 + \boldsymbol{v}_2 = \begin{bmatrix}
+      \begin{bmatrix}tan(\phi_N)cos(\phi_D) & tan(\phi_N)sin(\phi_D) & -1\end{bmatrix} & \boldsymbol{0}_{1\times3} & \boldsymbol{0}_{1\times3} & \boldsymbol{0}_{1\times3} \\
+      \boldsymbol{0}_{3\times3} & \boldsymbol{I}_{3\times3} & \boldsymbol{0}_{3\times3} & \boldsymbol{0}_{3\times3}
+      \end{bmatrix}\boldsymbol{x}_2 + \boldsymbol{v}_2
 \end{equation}
 
 \section{Estimation with Additional Sensor}
@@ -391,8 +399,20 @@ is the heading found from the position data.
 This sensor should be one that can give position data. GPS, camera, encoder.
 From this extra sensor, you can set up a cost function that models the error 
 in the measurements and minimize it using gradient descent or something to 
-hopefully get the best estimate in position/heading. 
-
+hopefully get the best estimate in position/heading. \\
+$\delta\boldsymbol{\phi}:$ Orientation error \\
+$\delta\boldsymbol{v}:$ Velocity error \\
+$\boldsymbol{b}_g:$ Gyroscope bias \\
+$\boldsymbol{b}_a:$ Accelerometer bias \\
+$\boldsymbol{n}_g:$ Gyroscope noise \\
+$\boldsymbol{n}_a:$ Accelerometer noise \\
+$w_g:$ Gyroscope bias model noise \\
+$w_a:$ Accelerometer bias model noise \\
+$\boldsymbol{S}:$ Skew symmetric matrice of acceleration \\
+$\boldsymbol{C}^n_b:$ Rotation matrix \\
+$\beta:$ Markov process time constant \\
+$x(0) = y(0) = \theta(0) = 0$ \\
+$v = 10$, $w = 10$
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 %%% Local Variables: 
